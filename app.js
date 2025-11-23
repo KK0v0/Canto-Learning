@@ -27,7 +27,7 @@ const LESSONS = [
         formal: "早上好～我现在赶着出门，晚点再说！",
         jyutping: "zou2 san4 aa3 ~ ngo5 ji4 gaa1 gon2 zyu6 ceot1 mun4, ci4 di1 zoi3 gong2!",
         image: "https://api.iconify.design/mdi/clock-fast.svg",
-        audioName: "daily-1-0-v0"
+        audioName: "daily-1-1"
       },
       {
         text: "「唔該」多用於請求或小幫手; 「多謝」用於表達感謝",
@@ -40,13 +40,15 @@ const LESSONS = [
         text: "唔該晒你幫我搵拖板。",
         formal: "麻烦你帮我找拖线板，谢谢。",
         jyutping: "m4 goi1 saai3 nei5 bong1 ngo5 wan2 to1 baan2.",
-        image: "https://api.iconify.design/mdi/power-socket-uk.svg"
+        image: "https://api.iconify.design/mdi/power-socket-uk.svg",
+        audioName: "daily-1-2"
       },
       {
         text: "多謝你教我打桌球。",
         formal: "谢谢你教我打台球。",
         jyutping: "do1 ze6 nei5 gaau3 ngo5 daa2 coek3 kau4.",
-        image: "https://api.iconify.design/mdi/table-tennis.svg"
+        image: "https://api.iconify.design/mdi/table-tennis.svg",
+        audioName: "daily-1-3"
       },
       {
         text: "「對唔住」用於表達真心道歉／犯咗錯；「唔好意思」用於表達禮貌／輕微打擾／小事",
@@ -59,7 +61,8 @@ const LESSONS = [
         text: "對唔住我遲咗。",
         formal: "抱歉我迟了。",
         jyutping: "deoi3 m4 zyu6 ngo5 ci4 zo2.",
-        image: "https://api.iconify.design/mdi/emoticon-sad-outline.svg"
+        image: "https://api.iconify.design/mdi/emoticon-sad-outline.svg",
+        audioName: "daily-1-4"
       },
       {
         text: "唔好意思，想問下洗手間喺邊？",
