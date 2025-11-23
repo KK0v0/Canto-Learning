@@ -26,7 +26,8 @@ const LESSONS = [
         text: "早晨呀～我宜家趕住出門，遲啲再講！",
         formal: "早上好～我现在赶着出门，晚点再说！",
         jyutping: "zou2 san4 aa3 ~ ngo5 ji4 gaa1 gon2 zyu6 ceot1 mun4, ci4 di1 zoi3 gong2!",
-        image: "https://api.iconify.design/mdi/clock-fast.svg"
+        image: "https://api.iconify.design/mdi/clock-fast.svg",
+        audioName: "daily-1-0-v0"
       },
       {
         text: "「唔該」多用於請求或小幫手; 「多謝」用於表達感謝",
@@ -64,7 +65,8 @@ const LESSONS = [
         text: "唔好意思，想問下洗手間喺邊？",
         formal: "不好意思，想问下洗手间在哪里？",
         jyutping: "m4 hou2 ji3 si1, soeng2 man6 haa5 sai2 sau2 gaan1 hai2 bin1?",
-        image: "https://api.iconify.design/mdi/toilet.svg"
+        image: "https://api.iconify.design/mdi/toilet.svg",
+        audioName: "daily-1-5"
       },
       
     ],
@@ -117,14 +119,11 @@ function renderCards() {
       const idx = Number(card.dataset.index);
       const val = e.target.value;
       const audio = card.querySelector(".vocab-recording");
-      if (audio && val) {
-        const blob = await getRecording(keyFor(idx, val));
-        if (blob) {
-          audio.src = URL.createObjectURL(blob);
-        } else {
-          audio.removeAttribute("src");
-          audio.load();
-        }
+      const item = selectedLesson.items[idx];
+      if (audio && val && item && Array.isArray(item.vocab)) {
+        const vIdx = item.vocab.indexOf(val);
+        const paths = ['webm','m4a','mp3','wav'].map(ext => vocabPath(idx, vIdx, ext));
+        await setAudioSrc(audio, paths);
       }
     });
   });
@@ -136,6 +135,30 @@ function renderCards() {
 
 function isIcon(url) {
   return typeof url === 'string' && url.endsWith('.svg');
+}
+
+function setAudioSrc(audio, paths) {
+  let i = 0;
+  function tryNext() {
+    if (i >= paths.length) {
+      audio.removeAttribute('src');
+      audio.load();
+      return;
+    }
+    const p = paths[i++];
+    audio.onerror = () => tryNext();
+    audio.src = p;
+    audio.load();
+  }
+  tryNext();
+}
+
+function sentencePath(idx, ext) {
+  return `audio/${selectedLesson.id}-${idx}.${ext}`;
+}
+
+function vocabPath(idx, vIdx, ext) {
+  return `audio/${selectedLesson.id}-${idx}-v${vIdx}.${ext}`;
 }
 
 const DB_NAME = 'cantonese_app';
@@ -196,20 +219,26 @@ async function hydrateRecordings() {
     const idx = Number(card.dataset.index);
     const audio = card.querySelector('.my-recording');
     if (audio) {
-      const blob = await getRecording(keyFor(idx));
-      if (blob) audio.src = URL.createObjectURL(blob);
+      const item = selectedLesson.items[idx];
+      const base = (item && item.audioName) ? `audio/${item.audioName}` : null;
+      const paths = base 
+        ? ['webm','m4a','mp3','wav'].map(ext => `${base}.${ext}`)
+        : ['webm','m4a','mp3','wav'].map(ext => sentencePath(idx, ext));
+      await setAudioSrc(audio, paths);
     }
     const sel = card.querySelector('.vocab-select');
     const vAudio = card.querySelector('.vocab-recording');
     if (sel && vAudio) {
-      const val = sel.value;
-      const vBlob = await getRecording(keyFor(idx, val));
-      if (vBlob) vAudio.src = URL.createObjectURL(vBlob);
+      const item = selectedLesson.items[idx];
+      const vIdx = item && Array.isArray(item.vocab) ? item.vocab.indexOf(sel.value) : -1;
+      if (vIdx >= 0) {
+        const vPaths = ['webm','m4a','mp3','wav'].map(ext => vocabPath(idx, vIdx, ext));
+        await setAudioSrc(vAudio, vPaths);
+      }
     }
   }
 }
 
-// 移除 AI 語音相關函數
 
 function init() {
   initLessonSelect();
