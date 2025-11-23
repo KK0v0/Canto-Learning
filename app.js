@@ -16,7 +16,7 @@ const LESSONS = [
     name: "日常用語 1",
     items: [
       {
-        text: "返學詞彙：返學、上堂、老師、同學、實驗室、報告、功課、請假、約時間、交作業",
+        text: "返學詞彙：返學、上堂、老師、同學、實驗室、報告、功課、請假、約時間、開zoom meeting",
         formal: "上学词汇：上学、上课、老师、同学、实验室、报告、作业、请假、约时间、提交作业",
         jyutping: "faan1 hok6, soeng5 tong4, lou5 si1, tung4 hok6, sat6 jim6 sat1, bou3 gou3, gung1 fo3, cing2 gaa3, joek3 si4 gaan3, gaau1 zok3 jip6",
         image: "https://api.iconify.design/mdi/format-list-bulleted.svg",
@@ -32,7 +32,8 @@ const LESSONS = [
         text: "「唔該」多用於請求或小幫手; 「多謝」用於表達感謝",
         formal: "“麻烦/劳驾”多用于请求或小帮忙；“谢谢”用于表达感谢",
         jyutping: "m4 goi1 bong1 ngo5 hoi1 mun4 / m4 goi1 saai3. do1 ze6 nei5 bong1 ngo5 goi2 man4.",
-        image: "https://api.iconify.design/mdi/handshake-outline.svg"
+        image: "https://api.iconify.design/mdi/handshake-outline.svg",
+        note: true
       },
       {
         text: "唔該晒你幫我搵拖板。",
@@ -50,7 +51,8 @@ const LESSONS = [
         text: "「對唔住」用於表達真心道歉／犯咗錯；「唔好意思」用於表達禮貌／輕微打擾／小事",
         formal: "“对不起”用于表达真诚道歉/犯了错；“不好意思”用于表达礼貌/轻微打扰/小事",
         jyutping: "deoi3 m4 zyu6 jung6 jyu5 biu2 daat6 zan1 sam1 dou6 hip3 / faan6 zo2 co3; m4 hou2 ji3 si1 jung6 jyu5 biu2 daat6 lai5 maau6 / hing1 mei4 daa2 jiu3 / siu2 si6",
-        image: "https://api.iconify.design/mdi/information-outline.svg"
+        image: "https://api.iconify.design/mdi/information-outline.svg",
+        note: true
       },
       {
         text: "對唔住我遲咗。",
@@ -70,14 +72,10 @@ const LESSONS = [
 ];
 
 const els = {
-  voiceRefresh: document.getElementById("voice-refresh"),
-  voiceSelect: document.getElementById("voice-select"),
   lessonSelect: document.getElementById("lesson-select"),
   cards: document.getElementById("cards"),
-  supportWarnings: document.getElementById("support-warnings"),
 };
 
-let voices = [];
 let selectedLesson = LESSONS[0];
 
 function initLessonSelect() {
@@ -105,88 +103,117 @@ function renderCards() {
             <div class="title">${item.text}</div>
             <div class="jyutping">${item.jyutping}</div>
             ${item.formal ? `<div class=\"formal\">${item.formal}</div>` : ""}
-            ${item.vocab ? `<div class=\"vocab\"><label>詞彙：<select class=\"vocab-select\">${item.vocab.map(v=>`<option value=\"${v}\">${v}</option>`).join('')}</select></label></div>` : ""}
-            <div class="actions">
-              <button class="play-tts">播放讀音</button>
-            </div>
+            ${item.vocab ? `<div class=\"vocab\"><label>詞彙：<select class=\"vocab-select\">${item.vocab.map(v=>`<option value=\"${v}\">${v}</option>`).join('')}</select></label><audio class=\"vocab-recording\" controls></audio></div>` : ""}
+            ${(!item.note && !item.vocab) ? `<audio class=\"my-recording\" controls></audio>` : ``}
           </div>
         </article>
       `;
     })
     .join("");
 
-  els.cards.querySelectorAll(".play-tts").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+  els.cards.querySelectorAll(".vocab-select").forEach((sel) => {
+    sel.addEventListener("change", async (e) => {
       const card = e.target.closest(".card");
       const idx = Number(card.dataset.index);
-      const item = selectedLesson.items[idx];
-      speak(item.text);
+      const val = e.target.value;
+      const audio = card.querySelector(".vocab-recording");
+      if (audio && val) {
+        const blob = await getRecording(keyFor(idx, val));
+        if (blob) {
+          audio.src = URL.createObjectURL(blob);
+        } else {
+          audio.removeAttribute("src");
+          audio.load();
+        }
+      }
     });
   });
 
-  els.cards.querySelectorAll(".vocab-select").forEach((sel) => {
-    sel.addEventListener("change", (e) => {
-      const val = e.target.value;
-      if (val) speak(val);
-    });
-  });
+  // 已移除錄音與停止按鈕的事件綁定
+
+  hydrateRecordings();
 }
 
 function isIcon(url) {
   return typeof url === 'string' && url.endsWith('.svg');
 }
 
-function loadVoices() {
-  voices = speechSynthesis.getVoices();
-  els.voiceSelect.innerHTML = voices
-    .map((v, i) => `<option value="${i}">${v.name} (${v.lang})</option>`)
-    .join("");
+const DB_NAME = 'cantonese_app';
+const STORE = 'recordings';
 
-  const hkIndex = voices.findIndex((v) => v.lang.toLowerCase().startsWith("zh-hk"));
-  els.voiceSelect.value = hkIndex >= 0 ? String(hkIndex) : "0";
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-function speak(text) {
-  if (!window.speechSynthesis) {
-    warn("你的瀏覽器不支援語音合成（TTS）。");
-    return;
+function keyFor(idx, subKey) {
+  return subKey ? `${selectedLesson.id}:${idx}:${subKey}` : `${selectedLesson.id}:${idx}`;
+}
+
+async function saveRecording(id, blob) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.put({ id, blob });
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getRecording(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const store = tx.objectStore(STORE);
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteRecording(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function hydrateRecordings() {
+  const cards = els.cards.querySelectorAll('.card');
+  for (const card of cards) {
+    const idx = Number(card.dataset.index);
+    const audio = card.querySelector('.my-recording');
+    if (audio) {
+      const blob = await getRecording(keyFor(idx));
+      if (blob) audio.src = URL.createObjectURL(blob);
+    }
+    const sel = card.querySelector('.vocab-select');
+    const vAudio = card.querySelector('.vocab-recording');
+    if (sel && vAudio) {
+      const val = sel.value;
+      const vBlob = await getRecording(keyFor(idx, val));
+      if (vBlob) vAudio.src = URL.createObjectURL(vBlob);
+    }
   }
-  const utter = new SpeechSynthesisUtterance(text);
-  const v = voices[Number(els.voiceSelect.value)] || voices[0];
-  if (v) utter.voice = v;
-  utter.lang = (v && v.lang) || "zh-HK";
-  utter.rate = 0.95;
-  utter.pitch = 1;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utter);
 }
 
-function warn(msg) {
-  const div = document.createElement("div");
-  div.className = "warn";
-  div.textContent = msg;
-  els.supportWarnings.appendChild(div);
-}
-
-function clearWarnings() {
-  els.supportWarnings.innerHTML = "";
-}
-
-
-function initVoiceUI() {
-  els.voiceRefresh.addEventListener("click", () => loadVoices());
-  if (typeof speechSynthesis !== "undefined") {
-    speechSynthesis.onvoiceschanged = loadVoices;
-    loadVoices();
-  } else {
-    warn("你的瀏覽器不支援語音合成（TTS）。");
-  }
-}
+// 移除 AI 語音相關函數
 
 function init() {
   initLessonSelect();
   renderCards();
-  initVoiceUI();
 }
 
 document.addEventListener("DOMContentLoaded", init);
